@@ -1,11 +1,14 @@
 // ==UserScript==
 // @name         WZW-Audit-tool
 // @namespace    http://tampermonkey.net/
-// @version      8.0
-// @description  审计实训万能填表助手 v8.0 - 在线题库下载/清理，悬浮可拖拽面板
+// @version      8.1
+// @description  审计实训万能填表助手 v8.1 - 在线题库下载，支持 脚本猫/油猴
 // @author       Allen
 // @match        http://10.18.0.178:9350/*
 // @grant        none
+// @supportURL   https://github.com/allen0039/WZW-Audit-tool
+// @homepageURL  https://github.com/allen0039/WZW-Audit-tool
+// @license      MIT
 // ==/UserScript==
 
 // ============================================================
@@ -18,10 +21,12 @@
 (function(){'use strict';
 
 // ============================================================
-// ★ 配置区：将 tiku.json 发布到 GitHub 后修改此 URL
-//    支持 GitHub Raw、GitHub Pages、任何静态托管
+// ★ 配置区：多 CDN 线路，按顺序尝试，国内用户首选 jsDelivr
 // ============================================================
-const TIKU_URL = 'https://raw.githubusercontent.com/allen0039/WZW-Audit-tool/main/tiku.json';
+const TIKU_URLS = [
+  'https://cdn.jsdelivr.net/gh/allen0039/WZW-Audit-tool@main/tiku.json',
+  'https://raw.githubusercontent.com/allen0039/WZW-Audit-tool/main/tiku.json'
+];
 // ============================================================
 
 const STORAGE_KEY = 'shenjitools_tiku';
@@ -37,24 +42,31 @@ async function downloadTiku() {
   if(!btn) return;
   btn.innerHTML = '⏳ 下载中...';
   btn.disabled = true;
-  try {
-    const resp = await fetch(TIKU_URL);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
-    const data = await resp.json();
-    const count = Object.keys(data).length;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    btn.innerHTML = '✅ 已下载';
-    updateStatus();
-    showToast('✅ 题库下载完成，共 ' + count + ' 个数据项！', 'success');
-  } catch (e) {
-    showToast('❌ 下载失败：' + e.message, 'error');
-    btn.innerHTML = '📥 下载题库';
-  } finally {
-    setTimeout(() => {
-      btn.innerHTML = '📥 下载题库';
-      btn.disabled = false;
-    }, 2000);
+  let lastErr = null;
+  for (const url of TIKU_URLS) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
+      const data = await resp.json();
+      const count = Object.keys(data).length;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      btn.innerHTML = '✅ 已下载';
+      updateStatus();
+      showToast('✅ 题库下载完成，共 ' + count + ' 个数据项！', 'success');
+      setTimeout(() => {
+        btn.innerHTML = '📥 下载题库';
+        btn.disabled = false;
+      }, 2000);
+      return;
+    } catch (e) {
+      lastErr = e;
+    }
   }
+  showToast('❌ 下载失败（所有线路）：' + (lastErr ? lastErr.message : '未知错误'), 'error');
+  setTimeout(() => {
+    btn.innerHTML = '📥 下载题库';
+    btn.disabled = false;
+  }, 2000);
 }
 
 function clearTiku() {
@@ -448,7 +460,7 @@ function init() {
   
   const subtitle = document.createElement('div');
   subtitle.className = 'wzw-subtitle';
-  subtitle.innerHTML = 'v8.0 • by Allen';
+  subtitle.innerHTML = 'v8.1 • by Allen';
   titleGroup.appendChild(subtitle);
   
   header.appendChild(titleGroup);

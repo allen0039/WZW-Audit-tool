@@ -1,11 +1,14 @@
 // ==UserScript==
 // @name         WZW-Audit-tool (内置题库版)
 // @namespace    http://tampermonkey.net/
-// @version      8.0-builtin
-// @description  审计实训万能填表助手 v8.0 - 内置388条题库，无需下载
+// @version      8.1-builtin
+// @description  审计实训万能填表助手 v8.1 - 内置388条题库，无需下载，支持 脚本猫/油猴
 // @author       Allen
 // @match        http://10.18.0.178:9350/*
 // @grant        none
+// @supportURL   https://github.com/allen0039/WZW-Audit-tool
+// @homepageURL  https://github.com/allen0039/WZW-Audit-tool
+// @license      MIT
 // ==/UserScript==
 
 (function(){'use strict';
@@ -402,7 +405,7 @@ function init() {
   
   const subtitle = document.createElement('div');
   subtitle.className = 'wzw-subtitle';
-  subtitle.innerHTML = 'v8.0-builtin • by Allen';
+  subtitle.innerHTML = 'v8.1-builtin • by Allen';
   titleGroup.appendChild(subtitle);
   
   header.appendChild(titleGroup);
