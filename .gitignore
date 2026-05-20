@@ -1,0 +1,15 @@
+# Backups and temporary files
+*.bak
+*.png
+.DS_Store
+.claude/
+
+# Extra/intermediate database files (only tiku.json is needed)
+tiku_all.json
+tiku_complete.json
+tiku_complete_min.json
+tiku_min.json
+tiku_data.js
+
+# Release directory (redundant as files are in root)
+release/
