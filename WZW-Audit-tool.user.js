@@ -496,8 +496,15 @@ function init() {
     panel.classList.add('minimized');
   }
 
+  // 拖拽与点击的状态变量
+  let isDragging = false;
+  let dragMoved = false;
+  let startX, startY;
+  let initialX, initialY;
+
   // 展开面板事件
   panel.addEventListener('click', (e) => {
+    if (dragMoved) return; // 如果刚才进行了拖拽，不触发点击展开
     if (panel.classList.contains('minimized')) {
       panel.classList.remove('minimized');
       localStorage.setItem('wzw_panel_minimized', 'false');
@@ -511,16 +518,20 @@ function init() {
     localStorage.setItem('wzw_panel_minimized', 'true');
   });
 
-  // 实现头部拖拽逻辑
-  let isDragging = false;
-  let startX, startY;
-  let initialX, initialY;
-
-  header.addEventListener('mousedown', dragStart);
+  // 绑定拖拽事件到整个面板
+  panel.addEventListener('mousedown', dragStart);
 
   function dragStart(e) {
-    if (e.target.closest('.wzw-toggle-btn')) return; // 如果点击的是收起按钮，不触发拖拽
+    // 展开状态下只允许通过头部拖拽；收起状态下允许拖拽整个圆形气泡
+    if (!panel.classList.contains('minimized') && !e.target.closest('.wzw-header')) {
+      return;
+    }
+    // 如果点击的是收起按钮或功能按钮，不触发拖拽
+    if (e.target.closest('.wzw-toggle-btn') || e.target.closest('.wzw-btn')) {
+      return;
+    }
     isDragging = true;
+    dragMoved = false;
     startX = e.clientX;
     startY = e.clientY;
     
@@ -544,6 +555,11 @@ function init() {
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
     
+    // 鼠标移动距离超过 5 像素判定为拖拽操作，防止误触点击
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      dragMoved = true;
+    }
+    
     // 限制拖拽边界，不允许拖出浏览器可视区域
     const newX = Math.max(10, Math.min(window.innerWidth - panel.offsetWidth - 10, initialX + dx));
     const newY = Math.max(10, Math.min(window.innerHeight - panel.offsetHeight - 10, initialY + dy));
@@ -556,6 +572,8 @@ function init() {
     isDragging = false;
     document.removeEventListener('mousemove', dragMove);
     document.removeEventListener('mouseup', dragEnd);
+    // 延时重置 dragMoved 状态，确保在 click 事件触发之后才重置
+    setTimeout(() => { dragMoved = false; }, 50);
   }
 }
 
