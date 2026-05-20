@@ -3,6 +3,7 @@
 *.png
 .DS_Store
 .claude/
+jiyi.md
 
 # Extra/intermediate database files (only tiku.json is needed)
 tiku_all.json

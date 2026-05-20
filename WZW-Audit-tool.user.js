@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         shenjitools
+// @name         WZW-Audit-tool
 // @namespace    http://tampermonkey.net/
 // @version      8.0
 // @description  审计实训万能填表助手 v8.0 - 在线题库下载/清理，脚本仅 3KB
-// @author       AI
+// @author       Allen
 // @match        http://10.18.0.178:9350/*
 // @grant        none
 // ==/UserScript==

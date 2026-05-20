@@ -17,7 +17,7 @@
 
 | 文件 | 说明 |
 |------|------|
-| `shenjitools.user.js` | **Tampermonkey 主脚本**，支持一键下载、清理及自动填表逻辑 |
+| `WZW-Audit-tool.user.js` | **Tampermonkey 主脚本**，支持一键下载、清理及自动填表逻辑 |
 | `tiku.json` | **合并版在线题库**，包含全部 388 个索引数据（表单+单据答案） |
 | `extract_all.py` | **全量提取脚本**：扫描 `tiku/` 文件夹下所有 xlsx + docx 文件并生成数据 |
 | `regenerate_all.py` | **题库重组脚本**：将提取出的数据处理并进行合并重组 |
@@ -28,7 +28,7 @@
 
 ### 1. 安装脚本
 1. 在浏览器中安装 [Tampermonkey](https://www.tampermonkey.net/) 扩展。
-2. 打开 `shenjitools.user.js`，Tampermonkey 将自动识别并提示安装。
+2. 打开 `WZW-Audit-tool.user.js`，Tampermonkey 将自动识别并提示安装。
 
 ### 2. 下载题库
 1. 安装脚本后，进入任意审计实训页面。
