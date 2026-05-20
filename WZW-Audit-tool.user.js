@@ -2,7 +2,7 @@
 // @name         WZW-Audit-tool
 // @namespace    http://tampermonkey.net/
 // @version      8.0
-// @description  审计实训万能填表助手 v8.0 - 在线题库下载/清理，脚本仅 3KB
+// @description  审计实训万能填表助手 v8.0 - 在线题库下载/清理，悬浮可拖拽面板
 // @author       Allen
 // @match        http://10.18.0.178:9350/*
 // @grant        none
@@ -27,32 +27,46 @@ function getTiku() {
 
 async function downloadTiku() {
   const btn = document.getElementById('dl-tiku-btn');
-  btn.textContent = '⏳下载中...';
-  btn.style.opacity = '0.7';
+  if(!btn) return;
+  btn.innerHTML = '⏳ 下载中...';
+  btn.disabled = true;
   try {
     const resp = await fetch(TIKU_URL);
     if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
     const data = await resp.json();
     const count = Object.keys(data).length;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    btn.innerHTML = '✅已下载';
-    showToast('✅题库下载完成，共 ' + count + ' 个索引（含表单+单据答案），请刷新后使用', 'success');
-    setTimeout(() => { btn.innerHTML = '📥下载题库'; btn.style.opacity = '1'; }, 3000);
+    btn.innerHTML = '✅ 已下载';
+    updateStatus();
+    showToast('✅ 题库下载完成，共 ' + count + ' 个数据项！', 'success');
   } catch (e) {
-    showToast('❌下载失败：' + e.message, 'error');
-    btn.innerHTML = '📥下载题库';
-    btn.style.opacity = '1';
+    showToast('❌ 下载失败：' + e.message, 'error');
+    btn.innerHTML = '📥 下载题库';
+  } finally {
+    setTimeout(() => {
+      btn.innerHTML = '📥 下载题库';
+      btn.disabled = false;
+    }, 2000);
   }
 }
 
 function clearTiku() {
   localStorage.removeItem(STORAGE_KEY);
-  const btn = document.getElementById('clear-tiku-btn');
-  if (btn) {
-    btn.innerHTML = '✅已清理';
-    setTimeout(() => { btn.innerHTML = '🗑清理本地题库'; }, 2000);
+  updateStatus();
+  showToast('✅ 本地题库已清理', 'success');
+}
+
+function updateStatus() {
+  const statusEl = document.getElementById('wzw-status');
+  if (!statusEl) return;
+  const tiku = getTiku();
+  if (tiku) {
+    statusEl.innerHTML = `🟢 题库就绪（已缓存 ${Object.keys(tiku).length} 项）`;
+    statusEl.className = 'wzw-status success';
+  } else {
+    statusEl.innerHTML = `🟡 题库未检测到，请先下载`;
+    statusEl.className = 'wzw-status warning';
   }
-  showToast('✅本地题库已清理，再次使用需重新下载', 'success');
 }
 
 function getSpread(){
@@ -150,31 +164,37 @@ function autoFillBillForm(){
 async function autoFill(){
   const tiku = getTiku();
   if (!tiku) {
-    showToast('⚠️题库未下载，请先点击「下载题库」按钮', 'warning');
+    showToast('⚠️ 题库未下载，请先点击「下载题库」', 'warning');
     return;
   }
   const btn=document.getElementById('auto-fill-btn');
-  btn.textContent='⏳识别中...';btn.style.opacity='0.7';
+  if(!btn) return;
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '⏳ 自动识别中...';
+  btn.disabled = true;
    try{
-    if(autoFillBillForm()){btn.innerHTML='✅已填';setTimeout(()=>{btn.innerHTML='🤖万能填表';btn.style.opacity='1';},3000);return;}
+    if(autoFillBillForm()){
+      showToast('✅ 表单自动填写完成', 'success');
+      return;
+    }
     if(!window.GC?.Spread?.Sheets){
      await new Promise((res,rej)=>{
       let n=0;
-      const iv=setInterval(()=>{if(window.GC?.Spread?.Sheets){clearInterval(iv);res();}else if(n++>50){clearInterval(iv);rej();}},200);
+      const iv=setInterval(()=>{if(window.GC?.Spread?.Sheets){clearInterval(iv);res()}else if(n++>50){clearInterval(iv);rej()}},200);
      });
     }
     const spread=getSpread();
-    if(!spread){showToast('⚠️未检测到适用页面');btn.innerHTML='🤖万能填表';btn.style.opacity='1';return;}
+    if(!spread){showToast('⚠️ 未检测到适用页面');return;}
     
    const sheet=spread.getActiveSheet();
    const maxR=sheet.getRowCount();
    const maxC=sheet.getColumnCount();
    
     const indices=detectAllIndices(sheet);
-    if(indices.length===0){showToast('⚠️未检测到索引号，该题目暂无题库答案');btn.innerHTML='🤖万能填表';btn.style.opacity='1';return;}
+    if(indices.length===0){showToast('⚠️ 未检测到索引号，该题目暂无题库答案');return;}
     
     const matched=indices.filter(i=>tiku[i.idx]);
-    if(matched.length===0){showToast('⚠️题库无['+indices.map(i=>i.idx).join(',')+']数据，还未录入');btn.innerHTML='🤖万能填表';btn.style.opacity='1';return;}
+    if(matched.length===0){showToast('⚠️ 题库无['+indices.map(i=>i.idx).join(',')+']数据，还未录入');return;}
    
     let totalFilled=0,totalSkipped=0,totalErrors=0;
     const msgs=[];
@@ -205,53 +225,337 @@ async function autoFill(){
    }
    
    showToast('📋'+msgs.join(' | '),'info');
-   await new Promise(r=>setTimeout(r,1500));
+   await new Promise(r=>setTimeout(r,1000));
    showToast('✅填写完成(填'+totalFilled+'项,跳过'+totalSkipped+',错误'+totalErrors+')','success');
-   btn.innerHTML='✅已填';
-   setTimeout(()=>{btn.innerHTML='🤖万能填表';btn.style.opacity='1';},3000);
   }catch(e){
    console.error(e);
    showToast('❌'+e.message,'error');
-   btn.innerHTML='🤖万能填表';btn.style.opacity='1';
+  } finally {
+   btn.innerHTML = originalHtml;
+   btn.disabled = false;
   }
 }
 
 function showToast(msg,type='info'){
   const old=document.getElementById('auto-fill-toast');
   if(old)old.remove();
-  const c={success:'#4CAF50',error:'#f44336',info:'#2196F3',warning:'#FF9800'};
+  const c={success:'#10b981',error:'#ef4444',info:'#3b82f6',warning:'#f59e0b'};
   const t=document.createElement('div');
   t.id='auto-fill-toast';t.textContent=msg;
-  t.style.cssText='position:fixed;top:20px;right:20px;background:'+c[type]+';color:white;padding:15px 25px;border-radius:8px;font-size:14px;z-index:9999999;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+  t.style.cssText='position:fixed;top:20px;right:20px;background:'+c[type]+';color:white;padding:12px 20px;border-radius:8px;font-size:13px;z-index:9999999;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);font-family:system-ui,sans-serif;pointer-events:none;';
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),3000);
 }
 
-function init(){
-  const s=document.createElement('style');
-  s.textContent='#auto-fill-btn{position:fixed;bottom:100px;right:20px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:12px 20px;border-radius:25px;cursor:pointer;font-size:14px;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.3);z-index:999999;user-select:none}#dl-tiku-btn{position:fixed;bottom:150px;right:20px;background:linear-gradient(135deg,#43e97b 0%,#38f9d7 100%);color:white;padding:8px 16px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,0.2);z-index:999999;user-select:none}#clear-tiku-btn{position:fixed;bottom:190px;right:20px;background:linear-gradient(135deg,#fa709a 0%,#fee140 100%);color:white;padding:8px 16px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,0.2);z-index:999999;user-select:none}';
+function init() {
+  const s = document.createElement('style');
+  s.textContent = `
+    #wzw-audit-panel {
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      width: 280px;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(10px);
+      z-index: 999999;
+      font-family: system-ui, -apple-system, sans-serif;
+      transition: width 0.2s, height 0.2s, border-radius 0.2s, box-shadow 0.2s;
+      overflow: hidden;
+    }
+    #wzw-audit-panel.minimized {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      cursor: pointer;
+      background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+    }
+    #wzw-audit-panel.minimized:hover {
+      transform: scale(1.05);
+    }
+    .wzw-header {
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: move;
+      user-select: none;
+    }
+    .wzw-title-group {
+      pointer-events: none;
+    }
+    .wzw-title {
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .wzw-subtitle {
+      font-size: 10px;
+      opacity: 0.6;
+    }
+    .wzw-toggle-btn {
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wzw-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+    .wzw-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .wzw-status {
+      font-size: 11px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border-left: 3px solid #64748b;
+      font-weight: 500;
+    }
+    .wzw-status.success {
+      color: #0f5132;
+      background: #d1e7dd;
+      border-left-color: #10b981;
+    }
+    .wzw-status.warning {
+      color: #664d03;
+      background: #fff3cd;
+      border-left-color: #f59e0b;
+    }
+    .wzw-btn {
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .wzw-btn-primary {
+      background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+      color: white;
+      box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);
+      width: 100%;
+    }
+    .wzw-btn-primary:hover:not(:disabled) {
+      box-shadow: 0 6px 12px rgba(79, 70, 229, 0.3);
+      transform: translateY(-1px);
+    }
+    .wzw-btn-secondary {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #e2e8f0;
+      flex: 1;
+    }
+    .wzw-btn-secondary:hover:not(:disabled) {
+      background: #e2e8f0;
+    }
+    .wzw-btn-danger {
+      background: #fff5f5;
+      color: #e53e3e;
+      border: 1px solid #fed7d7;
+      flex: 1;
+    }
+    .wzw-btn-danger:hover:not(:disabled) {
+      background: #e53e3e;
+      color: white;
+    }
+    .wzw-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .wzw-row {
+      display: flex;
+      gap: 8px;
+    }
+    .wzw-divider {
+      height: 1px;
+      background: #e2e8f0;
+    }
+    .wzw-bubble-icon {
+      font-size: 22px;
+      user-select: none;
+      display: none;
+    }
+    #wzw-audit-panel.minimized .wzw-bubble-icon {
+      display: block;
+    }
+    #wzw-audit-panel.minimized .wzw-header,
+    #wzw-audit-panel.minimized .wzw-body {
+      display: none;
+    }
+  `;
   document.head.appendChild(s);
 
-  const dlBtn=document.createElement('div');
-  dlBtn.id='dl-tiku-btn';dlBtn.innerHTML='📥下载题库';
-  dlBtn.addEventListener('click',downloadTiku);
-  document.body.appendChild(dlBtn);
+  // 创建面板
+  const panel = document.createElement('div');
+  panel.id = 'wzw-audit-panel';
 
-  const clearBtn=document.createElement('div');
-  clearBtn.id='clear-tiku-btn';clearBtn.innerHTML='🗑清理本地题库';
-  clearBtn.addEventListener('click',clearTiku);
-  document.body.appendChild(clearBtn);
+  // 创建最小化图标
+  const bubbleIcon = document.createElement('div');
+  bubbleIcon.className = 'wzw-bubble-icon';
+  bubbleIcon.innerHTML = '🤖';
+  panel.appendChild(bubbleIcon);
 
-  const btn=document.createElement('div');
-  btn.id='auto-fill-btn';btn.innerHTML='🤖万能填表';
-  btn.addEventListener('click',autoFill);
-  document.body.appendChild(btn);
+  // 创建头部
+  const header = document.createElement('div');
+  header.className = 'wzw-header';
+  
+  const titleGroup = document.createElement('div');
+  titleGroup.className = 'wzw-title-group';
+  
+  const title = document.createElement('div');
+  title.className = 'wzw-title';
+  title.innerHTML = '🤖 WZW-Audit-tool';
+  titleGroup.appendChild(title);
+  
+  const subtitle = document.createElement('div');
+  subtitle.className = 'wzw-subtitle';
+  subtitle.innerHTML = 'v8.0 • by Allen';
+  titleGroup.appendChild(subtitle);
+  
+  header.appendChild(titleGroup);
 
-  const tiku=getTiku();
-  if (tiku) {
-    showToast('✅万能填表就绪（本地题库 '+Object.keys(tiku).length+' 项）','info');
-  } else {
-    showToast('📥首次使用请点击「下载题库」按钮','warning');
+  const toggleBtn = document.createElement('button');
+  toggleBtn.className = 'wzw-toggle-btn';
+  toggleBtn.innerHTML = '➖';
+  header.appendChild(toggleBtn);
+  
+  panel.appendChild(header);
+
+  // 创建主体内容
+  const body = document.createElement('div');
+  body.className = 'wzw-body';
+
+  // 状态指示
+  const statusEl = document.createElement('div');
+  statusEl.id = 'wzw-status';
+  body.appendChild(statusEl);
+
+  // 主按钮：智能填表
+  const fillBtn = document.createElement('button');
+  fillBtn.id = 'auto-fill-btn';
+  fillBtn.className = 'wzw-btn wzw-btn-primary';
+  fillBtn.innerHTML = '🤖 自动填充表格/单据';
+  fillBtn.addEventListener('click', autoFill);
+  body.appendChild(fillBtn);
+
+  // 分割线
+  const divider = document.createElement('div');
+  divider.className = 'wzw-divider';
+  body.appendChild(divider);
+
+  // 辅助按键行 (下载 + 清理)
+  const row = document.createElement('div');
+  row.className = 'wzw-row';
+
+  const dlBtn = document.createElement('button');
+  dlBtn.id = 'dl-tiku-btn';
+  dlBtn.className = 'wzw-btn wzw-btn-secondary';
+  dlBtn.innerHTML = '📥 下载题库';
+  dlBtn.addEventListener('click', downloadTiku);
+  row.appendChild(dlBtn);
+
+  const clearBtn = document.createElement('button');
+  clearBtn.id = 'clear-tiku-btn';
+  clearBtn.className = 'wzw-btn wzw-btn-danger';
+  clearBtn.innerHTML = '🗑 清理';
+  clearBtn.addEventListener('click', clearTiku);
+  row.appendChild(clearBtn);
+
+  body.appendChild(row);
+  panel.appendChild(body);
+
+  document.body.appendChild(panel);
+
+  // 初始化状态显示
+  updateStatus();
+
+  // 读取上次存储的面板状态
+  if (localStorage.getItem('wzw_panel_minimized') === 'true') {
+    panel.classList.add('minimized');
+  }
+
+  // 展开面板事件
+  panel.addEventListener('click', (e) => {
+    if (panel.classList.contains('minimized')) {
+      panel.classList.remove('minimized');
+      localStorage.setItem('wzw_panel_minimized', 'false');
+    }
+  });
+
+  // 收起面板事件
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // 阻止冒泡，避免触发 panel.click 再次展开
+    panel.classList.add('minimized');
+    localStorage.setItem('wzw_panel_minimized', 'true');
+  });
+
+  // 实现头部拖拽逻辑
+  let isDragging = false;
+  let startX, startY;
+  let initialX, initialY;
+
+  header.addEventListener('mousedown', dragStart);
+
+  function dragStart(e) {
+    if (e.target.closest('.wzw-toggle-btn')) return; // 如果点击的是收起按钮，不触发拖拽
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    
+    const rect = panel.getBoundingClientRect();
+    initialX = rect.left;
+    initialY = rect.top;
+    
+    // 清除 right/bottom 布局，转为以 left/top 绝对定位，保证拖拽流畅
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+    panel.style.left = initialX + 'px';
+    panel.style.top = initialY + 'px';
+    
+    document.addEventListener('mousemove', dragMove);
+    document.addEventListener('mouseup', dragEnd);
+    e.preventDefault();
+  }
+
+  function dragMove(e) {
+    if (!isDragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    
+    // 限制拖拽边界，不允许拖出浏览器可视区域
+    const newX = Math.max(10, Math.min(window.innerWidth - panel.offsetWidth - 10, initialX + dx));
+    const newY = Math.max(10, Math.min(window.innerHeight - panel.offsetHeight - 10, initialY + dy));
+    
+    panel.style.left = newX + 'px';
+    panel.style.top = newY + 'px';
+  }
+
+  function dragEnd() {
+    isDragging = false;
+    document.removeEventListener('mousemove', dragMove);
+    document.removeEventListener('mouseup', dragEnd);
   }
 }
 
