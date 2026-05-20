@@ -8,6 +8,13 @@
 // @grant        none
 // ==/UserScript==
 
+// ============================================================
+// ★ 免责声明：
+//   1. 本项目（WZW-Audit-tool）仅用于学习交流及辅助教学，请勿依赖。
+//   2. 题库数据无法保证 100% 准确无误，填写结果仅供参考，必须经人工审核！
+//   3. 本项目完全开源免费，【严禁用于任何商业用途】！
+// ============================================================
+
 (function(){'use strict';
 
 // ============================================================
@@ -404,6 +411,16 @@ function init() {
     #wzw-audit-panel.minimized .wzw-body {
       display: none;
     }
+    .wzw-disclaimer {
+      font-size: 9px;
+      color: #94a3b8;
+      line-height: 1.4;
+      margin-top: 4px;
+      text-align: center;
+      border-top: 1px dashed #e2e8f0;
+      padding-top: 8px;
+      user-select: none;
+    }
   `;
   document.head.appendChild(s);
 
@@ -484,6 +501,13 @@ function init() {
   row.appendChild(clearBtn);
 
   body.appendChild(row);
+
+  // 创建免责声明
+  const disclaimerEl = document.createElement('div');
+  disclaimerEl.className = 'wzw-disclaimer';
+  disclaimerEl.innerHTML = '⚠️ 免责声明：本插件仅供学习辅助使用，不保证数据100%正确，所有自动填写的结果均需人工二次审核，禁止商业用途！';
+  body.appendChild(disclaimerEl);
+
   panel.appendChild(body);
 
   document.body.appendChild(panel);
