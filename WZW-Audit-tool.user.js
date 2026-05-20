@@ -21,14 +21,13 @@
 (function(){'use strict';
 
 // ============================================================
-// ★ 配置区：多 CDN 线路，按顺序尝试，国内用户首选 jsDelivr
+// ★ 配置区：可用的下载源
 // ============================================================
-const TIKU_URLS = [
-  'https://cdn.jsdelivr.net/gh/allen0039/WZW-Audit-tool@main/tiku.json',
-  'https://raw.githubusercontent.com/allen0039/WZW-Audit-tool/main/tiku.json'
-];
-// ============================================================
-
+const TIKU_SOURCES = {
+  'jsDelivr CDN（国内推荐）': 'https://cdn.jsdelivr.net/gh/allen0039/WZW-Audit-tool@main/tiku.json',
+  'GitHub Raw（原始源）': 'https://raw.githubusercontent.com/allen0039/WZW-Audit-tool/main/tiku.json'
+};
+const SOURCE_KEY = 'shenjitools_source';
 const STORAGE_KEY = 'shenjitools_tiku';
 
 function getTiku() {
@@ -39,34 +38,31 @@ function getTiku() {
 
 async function downloadTiku() {
   const btn = document.getElementById('dl-tiku-btn');
+  const sel = document.getElementById('tiku-source-select');
   if(!btn) return;
+  const label = sel ? sel.value : Object.keys(TIKU_SOURCES)[0];
+  const url = TIKU_SOURCES[label];
+  if (!url) { showToast('❌ 未找到所选下载源', 'error'); return; }
+  if(sel) localStorage.setItem(SOURCE_KEY, label);
   btn.innerHTML = '⏳ 下载中...';
   btn.disabled = true;
-  let lastErr = null;
-  for (const url of TIKU_URLS) {
-    try {
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
-      const data = await resp.json();
-      const count = Object.keys(data).length;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      btn.innerHTML = '✅ 已下载';
-      updateStatus();
-      showToast('✅ 题库下载完成，共 ' + count + ' 个数据项！', 'success');
-      setTimeout(() => {
-        btn.innerHTML = '📥 下载题库';
-        btn.disabled = false;
-      }, 2000);
-      return;
-    } catch (e) {
-      lastErr = e;
-    }
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
+    const data = await resp.json();
+    const count = Object.keys(data).length;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    btn.innerHTML = '✅ 已下载';
+    updateStatus();
+    showToast('✅ 题库下载完成，共 ' + count + ' 个数据项！', 'success');
+  } catch (e) {
+    showToast('❌ 下载失败（' + label + '）：' + e.message, 'error');
+  } finally {
+    setTimeout(() => {
+      btn.innerHTML = '📥 下载题库';
+      btn.disabled = false;
+    }, 2000);
   }
-  showToast('❌ 下载失败（所有线路）：' + (lastErr ? lastErr.message : '未知错误'), 'error');
-  setTimeout(() => {
-    btn.innerHTML = '📥 下载题库';
-    btn.disabled = false;
-  }, 2000);
 }
 
 function clearTiku() {
@@ -407,6 +403,21 @@ function init() {
       display: flex;
       gap: 8px;
     }
+    .wzw-select {
+      width: 100%;
+      padding: 7px 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 11px;
+      background: #f8fafc;
+      color: #334155;
+      cursor: pointer;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .wzw-select:hover {
+      border-color: #cbd5e1;
+    }
     .wzw-divider {
       height: 1px;
       background: #e2e8f0;
@@ -493,6 +504,20 @@ function init() {
   const divider = document.createElement('div');
   divider.className = 'wzw-divider';
   body.appendChild(divider);
+
+  // 下载源选择
+  const sel = document.createElement('select');
+  sel.id = 'tiku-source-select';
+  sel.className = 'wzw-select';
+  const savedLabel = localStorage.getItem(SOURCE_KEY);
+  for (const label of Object.keys(TIKU_SOURCES)) {
+    const opt = document.createElement('option');
+    opt.value = label;
+    opt.textContent = label;
+    if (label === savedLabel) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  body.appendChild(sel);
 
   // 辅助按键行 (下载 + 清理)
   const row = document.createElement('div');
