@@ -129,6 +129,94 @@ function calcOffset(sheet, idx, tikuCells){
   return {rowOffset:2,colOffset:1};
 }
 
+function getBillText(doc, questionData){
+  const parts=[];
+  if(doc?.body?.innerText)parts.push(doc.body.innerText);
+  if(questionData){
+   for(const key of ['questionTitle','title','name','indexNo']){
+    if(questionData[key])parts.push(String(questionData[key]));
+   }
+   const detail=questionData.stuQuestionDetail;
+   if(detail){
+    for(const key of ['questionName','title','fieldA']){
+     if(detail[key])parts.push(typeof detail[key]==='string'?detail[key]:JSON.stringify(detail[key]));
+    }
+   }
+  }
+  return parts.join('\n');
+}
+
+function resolveBillFormAnswer(entry,doc,questionData={},fallbackFields={}){
+  if(!entry||entry.type!=='billForm')return {fields:entry||{},rows:{}};
+  const byCustomer=entry.byCustomer||{};
+  const text=getBillText(doc,questionData);
+  let customer=Object.keys(byCustomer).find(name=>text.includes(name));
+  if(!customer&&fallbackFields){
+   const fallbackText=Object.values(fallbackFields).map(v=>String(v||'')).join('\n');
+   customer=Object.keys(byCustomer).find(name=>fallbackText.includes(name));
+  }
+  if(!customer){
+   const match=text.match(/致[:：]\s*([^\n\r\t ]+?(?:有限公司|公司))/);
+   if(match)customer=Object.keys(byCustomer).find(name=>name.includes(match[1])||match[1].includes(name));
+  }
+  const keys=Object.keys(byCustomer);
+  const selected=customer?byCustomer[customer]:(keys.length===1?byCustomer[keys[0]]:null);
+  if(!selected)return {fields:{},rows:{}};
+  return {
+   customer,
+   fields:Object.assign({},selected.fields||{}),
+   rows:selected.rows||{}
+  };
+}
+
+function setInputValue(input,value,force=false){
+  if(!input||input.readOnly)return 'readonly';
+  const next=value==null?'':String(value);
+  if(!force&&(input.value||'')===next)return 'skipped';
+  input.value=next;
+  for(const type of ['input','change','blur']){
+   try{input.dispatchEvent(new Event(type,{bubbles:true}));}catch(e){}
+  }
+  return 'filled';
+}
+
+function fillInputsByName(doc,name,value,index,force=false){
+  const inputs=Array.from(doc.getElementsByName(name)||[]);
+  if(!inputs.length)return {filled:0,skipped:0};
+  const targets=index==null?inputs:[inputs[index]].filter(Boolean);
+  let filled=0,skipped=0;
+  for(const input of targets){
+   const status=setInputValue(input,value,force);
+   if(status==='filled')filled++;
+   else if(status==='skipped'||status==='readonly')skipped++;
+  }
+  return {filled,skipped};
+}
+
+function applyBillFormAnswer(doc,answer){
+  const rowGroups={
+   salesReceivable:{start:0,names:['b1','b2','b3','b4','b5']}
+  };
+  let filled=0,skipped=0;
+  for(const[name,value]of Object.entries(answer.fields||{})){
+   const stat=fillInputsByName(doc,name,value,null,true);
+   filled+=stat.filled;skipped+=stat.skipped;
+  }
+  for(const[groupName,rows]of Object.entries(answer.rows||{})){
+   const group=rowGroups[groupName];
+   if(!group||!Array.isArray(rows))continue;
+   rows.forEach((row,rowIndex)=>{
+    const targetIndex=group.start+rowIndex;
+    for(const name of group.names){
+     if(!(name in row))continue;
+     const stat=fillInputsByName(doc,name,row[name],targetIndex,true);
+     filled+=stat.filled;skipped+=stat.skipped;
+    }
+   });
+  }
+  return {filled,skipped};
+}
+
 function autoFillBillForm(){
   const tiku = getTiku();
   if (!tiku) return false;
@@ -157,21 +245,20 @@ function autoFillBillForm(){
   let billId='';
   if(sxBill?.billId) billId=sxBill.billId + (sxBill.version ? '@' + sxBill.version : '');
 
-  const tikuFields=tiku[billId];
-  if(tikuFields) Object.assign(answers,tikuFields);
-
-  const entries=Object.entries(answers);
-  if(entries.length===0) return false;
-  let filled=0,skipped=0;
-  for(const[name,value]of entries){
-   const inputs=doc.getElementsByName(name);
-   if(!inputs.length) continue;
-   for(const input of inputs){
-    if(input.readOnly) continue;
-    if((input.value||'')===value){skipped++;continue;}
-    input.value=value;filled++;
+  const indexNo=questionData?.indexNo;
+  let tikuFields=tiku[billId]||tiku[indexNo];
+  let billAnswer={fields:answers,rows:{}};
+  if(tikuFields&&!Array.isArray(tikuFields)){
+   if(tikuFields.type==='billForm'){
+    const resolved=resolveBillFormAnswer(tikuFields,doc,questionData,answers);
+    billAnswer={fields:Object.assign({},answers,resolved.fields),rows:resolved.rows};
+   }else{
+    Object.assign(answers,tikuFields);
+    billAnswer={fields:answers,rows:{}};
    }
   }
+  if(Object.keys(billAnswer.fields||{}).length===0&&Object.keys(billAnswer.rows||{}).length===0)return false;
+  const {filled,skipped}=applyBillFormAnswer(doc,billAnswer);
   if(filled>0||skipped>0) showToast('✅表单完成(填'+filled+'项,跳过'+skipped+')','success');
   return true;
 }
@@ -638,6 +725,10 @@ function init() {
   }
 }
 
-document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
+if(window.__WZW_AUDIT_DISABLE_INIT__){
+ window.__WZW_AUDIT_TESTS__={resolveBillFormAnswer,applyBillFormAnswer,fillInputsByName,setInputValue};
+}else{
+ document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
+}
 
 })();
